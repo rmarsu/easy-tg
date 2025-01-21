@@ -18,7 +18,7 @@ type Bot struct {
 }
 
 type Router struct {
-	Handlers map[string]func(bot *Bot, upd *tgbotapi.Update)
+	Handlers map[any]func(bot *Bot, upd *tgbotapi.Update)
 }
 
 func New(token string) (*Bot, error) {
@@ -29,7 +29,7 @@ func New(token string) (*Bot, error) {
 	return &Bot{
 		Waiter: waiter.New[int64, tgbotapi.Update](),
 		Router: &Router{
-			Handlers: make(map[string]func(bot *Bot, upd *tgbotapi.Update)),
+			Handlers: make(map[any]func(bot *Bot, upd *tgbotapi.Update)),
 		},
 		mu:     sync.Mutex{},
 		logger: logrus.New(),
@@ -37,12 +37,47 @@ func New(token string) (*Bot, error) {
 	}, nil
 }
 
-func (b *Bot) Add(call string, handler func(bot *Bot, upd *tgbotapi.Update)) {
+func (b *Bot) Add(call any, handler func(bot *Bot, upd *tgbotapi.Update)) {
 	b.Router.Handlers[call] = handler
 }
 
-func (b *Bot) Get(call string) (func(bot *Bot, upd *tgbotapi.Update), bool) {
-	if val, ok := b.Router.Handlers[call]; ok {
+func (b *Bot) Get(upd tgbotapi.Update) (func(bot *Bot, upd *tgbotapi.Update), bool) {
+	if upd.Message.Photo != nil {
+		if val, ok := b.Router.Handlers["photo"]; ok {
+			return val, true
+		}
+	}
+	if upd.Message.Video != nil {
+		if val, ok := b.Router.Handlers["video"]; ok {
+			return val, true
+		}
+	}
+	if upd.Message.Audio != nil {
+		if val, ok := b.Router.Handlers["audio"]; ok {
+			return val, true
+		}
+	}
+	if upd.Message.Document != nil {
+		if val, ok := b.Router.Handlers["document"]; ok {
+			return val, true
+		}
+	}
+	if upd.Message.Sticker != nil {
+		if val, ok := b.Router.Handlers["sticker"]; ok {
+			return val, true
+		}
+	}
+	if upd.Message.Contact != nil {
+		if val, ok := b.Router.Handlers["contact"]; ok {
+			return val, true
+		}
+	}
+	if upd.Message.Location != nil {
+		if val, ok := b.Router.Handlers["location"]; ok {
+			return val, true
+		}
+	}
+	if val, ok := b.Router.Handlers[upd.Message.Text]; ok {
 		return val, true
 	}
 	return nil, false
@@ -87,7 +122,7 @@ func (b *Bot) Start() {
 			continue
 		}
 
-		handler, ok := b.Get(update.Message.Text)
+		handler, ok := b.Get(update)
 		if !ok {
 			b.logger.Infof("Unknown handler: %v", update.Message)
 			continue
